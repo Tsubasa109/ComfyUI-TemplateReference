@@ -78,14 +78,6 @@ ComfyUI/user/template_reference/reference_templates/image/
 
 これらのフォルダには、ユーザーが作成した JSON ライブラリと、コピーされた参照画像が保存されます。
 
-互換性のため、拡張機能フォルダ内に保存されていた古いデータも引き続き読み込めます。
-
-```text
-ComfyUI/custom_nodes/ComfyUI-TemplateReference/prompt_templates/
-ComfyUI/custom_nodes/ComfyUI-TemplateReference/Template Reference/
-```
-
-新しく保存されるデータは `ComfyUI/user/template_reference/` に書き込まれます。
 
 ## 注意事項
 
