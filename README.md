@@ -4,10 +4,6 @@
 
 ComfyUI Template Reference adds two custom nodes for building reusable text, image, and prompt-template libraries directly inside ComfyUI.
 
-![Template Reference Node](./image/image1.png)
-
-![Prompt Template Node](./image/image/image2.png)
-
 ## Features
 
 - Create editable text reference blocks.
@@ -22,6 +18,8 @@ ComfyUI Template Reference adds two custom nodes for building reusable text, ima
 ## Nodes
 
 ### Template Reference
+
+![Template Reference Node](./image/image1.png)
 
 Use this node to collect mixed text and image references.
 
@@ -39,6 +37,8 @@ Main controls:
 - `Open` / `Save`: Load or save a Template Reference JSON library.
 
 ### Prompt Template
+
+![Prompt Template Node](./image/image2.png)
 
 Use this node to collect reusable prompt templates.
 
