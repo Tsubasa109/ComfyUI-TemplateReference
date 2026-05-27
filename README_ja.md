@@ -60,7 +60,7 @@ ComfyUI Template Reference は、ComfyUI 内で再利用可能なテキスト、
 
 ```bash
 cd ComfyUI/custom_nodes
-git clone <repository-url> ComfyUI-TemplateReference
+git clone https://github.com/Tsubasa109/ComfyUI-TemplateReference.git
 ```
 
 インストール後、ComfyUI を再起動してください。
