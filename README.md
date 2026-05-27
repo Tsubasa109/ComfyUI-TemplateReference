@@ -31,10 +31,17 @@ Outputs:
 
 Main controls:
 
+- `Open` / `Save`: Load or save the Template Reference JSON library.
+- `Output`: Select the block to send to the output.
+- `List Off` / `List On`: Turn each block off or on.
+- `Hide All` / `Show All`: Hide or show all blocks.
 - `Add Textbox`: Add a text reference block.
 - `Add LoadImage`: Add an image reference block.
-- `Output`: Select which block should be sent to the outputs.
-- `Open` / `Save`: Load or save a Template Reference JSON library.
+- `Hide` / `Show`: Hide or show the selected block.
+- `Copy`: Copy the contents of the textbox to the clipboard.
+- `Fit`: Adjust the block to fit the size of its text or image.
+- `Delete`: Delete the block.
+- `Upload`: Upload a reference image.
 
 ### Prompt Template
 
