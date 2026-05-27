@@ -17,6 +17,8 @@ ComfyUI Template Reference は、ComfyUI 内で再利用可能なテキスト、
 
 ### Template Reference
 
+![Template Reference Node](./image/image1.png)
+
 このノードは、テキストと画像の参照をまとめて管理するために使用します。
 
 出力:
@@ -33,6 +35,8 @@ ComfyUI Template Reference は、ComfyUI 内で再利用可能なテキスト、
 - `Open` / `Save`: Template Reference の JSON ライブラリを読み込み、または保存します。
 
 ### Prompt Template
+
+![Prompt Template Node](./image/image2.png)
 
 このノードは、再利用可能なプロンプトテンプレートをまとめて管理するために使用します。
 
