@@ -29,10 +29,17 @@ ComfyUI Template Reference は、ComfyUI 内で再利用可能なテキスト、
 
 主な操作:
 
+- `Open` / `Save`: Template Reference の JSON ライブラリを読み込み、または保存します。
+- `Output`: 出力へ送信するブロックを選択します。
+- `List Off` / `List On`:各ブロックをオフ/オンにする
+- `Hide All` / `Show all`:各ブロックを隠す/見せる
 - `Add Textbox`: テキスト参照ブロックを追加します。
 - `Add LoadImage`: 画像参照ブロックを追加します。
-- `Output`: 出力へ送信するブロックを選択します。
-- `Open` / `Save`: Template Reference の JSON ライブラリを読み込み、または保存します。
+- `Hide` / `Show`:対象ブロックを隠す/見せる。
+- `Copy`:テキストボックスの内容をクリップボードにコピーする
+- `Fit`:ブロックのテキスト/画像のサイズに合わせて最適化する
+- `Delete`:ブロックを削除する
+- `Upload`:参照画像をアップロードする
 
 ### Prompt Template
 
