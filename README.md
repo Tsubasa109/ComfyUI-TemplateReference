@@ -57,11 +57,18 @@ Outputs:
 
 Main controls:
 
-- `Add Template`: Add a prompt template block.
-- `Output`: Select which template should be sent to the text outputs.
+- `Open` / `Save`: Load or save the Prompt Template JSON library.
 - `none`: Output an empty prompt.
-- `Open` / `Save`: Load or save a Prompt Template JSON library.
-- `Image`: Show or hide an optional reference image area for each prompt block.
+- `Output`: Select the template to send to the text output.
+- `List Off` / `List On`: Turn each block off or on.
+- `Hide All` / `Show All`: Hide or show all blocks.
+- `Add Template`: Add a prompt template block.
+- `Hide` / `Show`: Hide or show the selected block.
+- `Image`: Show or hide the optional reference image area for each prompt block.
+- `Copy`: Copy the contents of the prompt textbox to the clipboard.
+- `Fit`: Adjust the block to fit the size of its text or reference image.
+- `Delete`: Delete the block.
+- `Upload`: Upload a reference image.
 
 ## Installation
 
