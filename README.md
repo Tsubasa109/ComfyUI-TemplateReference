@@ -8,24 +8,23 @@ ComfyUI Template Reference adds two custom nodes for building reusable text, ima
 
 ### Template Reference Feature
 
-Create editable text reference blocks.
-Upload images and preview them as image reference blocks.
-Save and load each block list as a JSON file.
-Select a specific block from the Output dropdown and output the selected text or image to other ComfyUI nodes.
-Drag and reorder blocks.
-Collapse, expand, resize, copy, and delete blocks directly in the node UI.
-JSON data created by the user is saved in ComfyUI’s user directory.
+* Create editable text reference blocks.
+* Upload images and preview them as image reference blocks.
+* Save and load each block list as a JSON file.
+* Select a specific block from the Output dropdown and output the selected text or image to other ComfyUI nodes.
+* Drag and reorder blocks.
+* Collapse, expand, resize, copy, and delete blocks directly in the node UI.
+* JSON data created by the user is saved in ComfyUI’s user directory.
 
 ### Prompt Template Feature
 
-Create prompt templates and set a prompt title and prompt text for each block.
-Upload images to each prompt template block and preview them as image references.
-Save and load each block list as a JSON file.
-Select a prompt template from a specific block in the Output dropdown and output the selected prompt to other ComfyUI nodes.
-Drag and reorder blocks.
-Collapse, expand, resize, copy, and delete blocks directly in the node UI.
-JSON data created by the user is saved in ComfyUI’s user directory.
-
+* Create prompt templates and set a prompt title and prompt text for each block.
+* Upload images to each prompt template block and preview them as image references.
+* Save and load each block list as a JSON file.
+* Select a prompt template from a specific block in the Output dropdown and output the selected prompt to other ComfyUI nodes.
+* Drag and reorder blocks.
+* Collapse, expand, resize, copy, and delete blocks directly in the node UI.
+* JSON data created by the user is saved in ComfyUI’s user directory.
 
 ## Nodes
 
