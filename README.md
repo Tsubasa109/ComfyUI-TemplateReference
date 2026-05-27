@@ -80,14 +80,6 @@ ComfyUI/user/template_reference/reference_templates/image/
 
 These folders contain user-created JSON libraries and copied reference images.
 
-For compatibility, older data saved inside the extension folder is still readable:
-
-```text
-ComfyUI/custom_nodes/ComfyUI-TemplateReference/prompt_templates/
-ComfyUI/custom_nodes/ComfyUI-TemplateReference/Template Reference/
-```
-
-New saves are written to `ComfyUI/user/template_reference/`.
 
 ## Notes
 
