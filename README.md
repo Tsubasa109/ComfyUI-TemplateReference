@@ -6,23 +6,26 @@ ComfyUI Template Reference adds two custom nodes for building reusable text, ima
 
 ## Features
 
-Template Reference Feature:
-- You can create editable text reference blocks.
-- You can upload images and preview them in image reference blocks.
-- Each block can be saved to and loaded from a JSON file as a list.
-- From the Output dropdown, you can select a specific block and output the selected text or image to other ComfyUI nodes.
-- Blocks can be reordered by dragging.
-- Blocks can be collapsed, expanded, resized, copied, and deleted in the node UI.
-- JSON data created by the user is saved in ComfyUI’s user directory.
+### Template Reference Feature
 
-Prompt Template Feature:
-- You can create prompt templates and set a prompt title and prompt text for each block.
-- You can upload images to each block’s prompt template and preview them as image references.
-- Each block can be saved to and loaded from a JSON file as a list.
-- From the Output dropdown, you can select a specific block’s prompt template and output the selected prompt to other ComfyUI nodes.
-- Blocks can be reordered by dragging.
-- Blocks can be collapsed, expanded, resized, copied, and deleted in the node UI.
-- JSON data created by the user is saved in ComfyUI’s user directory.
+Create editable text reference blocks.
+Upload images and preview them as image reference blocks.
+Save and load each block list as a JSON file.
+Select a specific block from the Output dropdown and output the selected text or image to other ComfyUI nodes.
+Drag and reorder blocks.
+Collapse, expand, resize, copy, and delete blocks directly in the node UI.
+JSON data created by the user is saved in ComfyUI’s user directory.
+
+### Prompt Template Feature
+
+Create prompt templates and set a prompt title and prompt text for each block.
+Upload images to each prompt template block and preview them as image references.
+Save and load each block list as a JSON file.
+Select a prompt template from a specific block in the Output dropdown and output the selected prompt to other ComfyUI nodes.
+Drag and reorder blocks.
+Collapse, expand, resize, copy, and delete blocks directly in the node UI.
+JSON data created by the user is saved in ComfyUI’s user directory.
+
 
 ## Nodes
 
