@@ -1,5 +1,7 @@
 # ComfyUI Template Reference
 
+[English](./README.md) / [日本語](./README-ja.md)
+
 ComfyUI Template Reference adds two custom nodes for building reusable text, image, and prompt-template libraries directly inside ComfyUI.
 
 ## Features
