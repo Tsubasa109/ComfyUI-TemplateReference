@@ -6,14 +6,23 @@ ComfyUI Template Reference adds two custom nodes for building reusable text, ima
 
 ## Features
 
-- Create editable text reference blocks.
-- Upload and preview image reference blocks.
-- Save and open template libraries as JSON files.
-- Select a specific block from an Output dropdown.
-- Output the selected text or image to other ComfyUI nodes.
-- Reorder blocks by dragging them.
-- Collapse, expand, resize, copy, and delete blocks from the node UI.
-- Store user-created data in ComfyUI's user directory instead of the extension install folder.
+Template Reference Feature:
+- You can create editable text reference blocks.
+- You can upload images and preview them in image reference blocks.
+- Each block can be saved to and loaded from a JSON file as a list.
+- From the Output dropdown, you can select a specific block and output the selected text or image to other ComfyUI nodes.
+- Blocks can be reordered by dragging.
+- Blocks can be collapsed, expanded, resized, copied, and deleted in the node UI.
+- JSON data created by the user is saved in ComfyUI’s user directory.
+
+Prompt Template Feature:
+- You can create prompt templates and set a prompt title and prompt text for each block.
+- You can upload images to each block’s prompt template and preview them as image references.
+- Each block can be saved to and loaded from a JSON file as a list.
+- From the Output dropdown, you can select a specific block’s prompt template and output the selected prompt to other ComfyUI nodes.
+- Blocks can be reordered by dragging.
+- Blocks can be collapsed, expanded, resized, copied, and deleted in the node UI.
+- JSON data created by the user is saved in ComfyUI’s user directory.
 
 ## Nodes
 
