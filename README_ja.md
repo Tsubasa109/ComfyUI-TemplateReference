@@ -2,6 +2,9 @@
 
 ComfyUI Template Reference は、ComfyUI 内で再利用可能なテキスト、画像、プロンプトテンプレートのライブラリを作成するためのカスタムノードを 2 つ追加します。
 
+## お知らせ
+* 2026年5月31日 -アップデート。プロンプトテンプレートにLoRA適用機能を追加した"Prompt Template LoRA"ノードを追加しました。
+
 ## 機能
 
 ### テンプレート参照機能
@@ -24,7 +27,10 @@ ComfyUI Template Reference は、ComfyUI 内で再利用可能なテキスト、
 * ノード UI 上で、ブロックの折りたたみ、展開、リサイズ、コピー、削除ができます。
 * ユーザーが作成した JSON データは、ComfyUI の user ディレクトリに保存されます。
 
-
+### プロンプトテンプレートLoRA適用機能
+* プロンプトテンプレート機能に追加してLoRAテンプレートにLoRA適用を追加できます。
+* ユーザーが作成した JSON データは、ComfyUI の user ディレクトリに保存されます。
+* プロンプトテンプレート機能で保存したJSONデータも読み込んで反映します。
 
 ## ノード
 
@@ -80,6 +86,44 @@ ComfyUI Template Reference は、ComfyUI 内で再利用可能なテキスト、
 - `Fit`:ブロックのテキスト/参照画像のサイズに合わせて最適化する
 - `Delete`:ブロックを削除する
 - `Upload`:参照画像をアップロードする
+
+### Prompt Template LoRA
+
+![Prompt Template Node](./image/image3.png)
+
+このノードは上記の「Prompt Template」に加えてLoRAの適用をします
+
+入力:
+
+- `model`: モデルの入力
+- `clip`: clipの入力
+
+出力:
+
+- `selected_prompt`: 選択されたプロンプトブロックのテキスト。
+- `prompt`: 同じ選択済みプロンプトテキストです。利便性のための出力です。
+- `lora_model`: LoRA適用したモデルの入力
+- `loraclip`: LoRA適用したclipの入力
+- `template_json`: ノード状態全体をシリアライズしたもの。
+
+主な操作:
+
+- `Open` / `Save`: Prompt Template LoRAまたはPrompt Template の JSON ライブラリを読み込み、または保存します(ファイル名の末尾に"lora"と付きます)。
+- `none`: 空のプロンプトを出力します。
+- `Output`: テキスト出力へ送信するテンプレートを選択します。
+- `List Off` / `List On`:各ブロックをオフ/オンにする
+- `Hide All` / `Show all`:各ブロックを隠す/見せる
+- `Add Template`: プロンプトテンプレートブロックを追加します。
+- `Hide` / `Show`:対象ブロックを隠す/見せる。
+- `LoRA`:LoRA画面を開く
+- `Image`: 各プロンプトブロックの任意の参照画像エリアを表示または非表示にします。
+- `Copy`:プロンプトのテキストボックスの内容をクリップボードにコピーする
+- `Fit`:ブロックのテキスト/参照画像のサイズに合わせて最適化する
+- `Delete`:ブロックを削除する
+- `Upload`:参照画像をアップロードする
+- `LoRA画面`:ComfyUIのloraフォルダから適用するLoRAモデルを選択
+- `STRENGTH`:LoRAの影響力の数値を調整できる。
+
 
 ## インストール
 
