@@ -3,6 +3,7 @@ import {
     NODE_NAME,
     STORAGE_WIDGET,
     PROMPT_NODE_NAME,
+    PROMPT_LORA_NODE_NAME,
     NODE_MIN_WIDTH,
     NODE_MIN_HEIGHT,
     NODE_CHROME_HEIGHT,
@@ -36,6 +37,7 @@ import {
 } from "./common.js";
 import { fetchReferenceTemplateList, openReferenceTemplateFile, saveReferenceTemplateFile } from "./api.js";
 import { setupPromptNode, syncPromptState } from "./prompt_template.js";
+import { setupPromptLoraNode } from "./prompt_template_lora.js";
 
 // ── Height calculation ─────────────────────────────────────────────────────────
 
@@ -745,6 +747,9 @@ LGraph.prototype.onBeforeSerialize = function () {
     for (const node of app.graph?.findNodesByType?.(PROMPT_NODE_NAME) || []) {
         node.syncPromptTemplate?.();
     }
+    for (const node of app.graph?.findNodesByType?.(PROMPT_LORA_NODE_NAME) || []) {
+        node.syncPromptTemplateLoRA?.();
+    }
 };
 
 // ── Extension registration ─────────────────────────────────────────────────────
@@ -787,6 +792,22 @@ app.registerExtension({
             nodeType.prototype.onConfigure = function (info) {
                 const result = onConfigure?.apply(this, arguments);
                 setupPromptNode(this);
+                return result;
+            };
+        }
+
+        if (nodeData.name === PROMPT_LORA_NODE_NAME) {
+            const onNodeCreated = nodeType.prototype.onNodeCreated;
+            nodeType.prototype.onNodeCreated = function () {
+                const result = onNodeCreated?.apply(this, arguments);
+                setupPromptLoraNode(this);
+                return result;
+            };
+
+            const onConfigure = nodeType.prototype.onConfigure;
+            nodeType.prototype.onConfigure = function (info) {
+                const result = onConfigure?.apply(this, arguments);
+                setupPromptLoraNode(this);
                 return result;
             };
         }

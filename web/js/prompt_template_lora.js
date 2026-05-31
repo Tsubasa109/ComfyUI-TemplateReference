@@ -13,7 +13,8 @@ import {
     hideWidget,
     makeId,
     normalizeImage,
-    normalizePromptItems,
+    normalizePromptLoraItems,
+    normalizeLora,
     normalizeTemplateList,
     promptSelectedId,
     promptListHidden,
@@ -35,7 +36,7 @@ import {
     copyTextToClipboard,
     showToast,
 } from "./common.js";
-import { fetchPromptTemplateList, openPromptTemplateFile, savePromptTemplateFile } from "./api.js";
+import { fetchLoraList, fetchPromptTemplateLoraList, openPromptTemplateLoraFile, savePromptTemplateLoraFile } from "./api.js";
 
 // ── Height calculation ─────────────────────────────────────────────────────────
 
@@ -57,7 +58,8 @@ function calculatePromptEditorHeight(node) {
             height +
             88 +
             textHeight(item) +
-            (item.image_collapsed ? 0 : 52 + previewHeight(item.image))
+            (item.image_collapsed ? 0 : 52 + previewHeight(item.image)) +
+            (item.lora_collapsed ? 0 : 54)
         );
     }, 0);
     return Math.max(NODE_MIN_HEIGHT, 76 + blockHeight);
@@ -146,7 +148,7 @@ async function loadPromptTemplateFiles(node, selectedName = "") {
         return;
     }
     try {
-        state.files = await fetchPromptTemplateList();
+        state.files = await fetchPromptTemplateLoraList();
         if (selectedName) {
             state.fileName = selectedName;
         }
@@ -195,9 +197,9 @@ function makePromptFileControls(node) {
 
         openButton.disabled = true;
         try {
-            const payload = await openPromptTemplateFile(name);
+            const payload = await openPromptTemplateLoraFile(name);
             const data = payload.data || {};
-            state.items = normalizePromptItems(JSON.stringify(data));
+            state.items = normalizePromptLoraItems(JSON.stringify(data));
             state.selectedId = promptSelectedId(JSON.stringify(data));
             state.listHidden = promptListHidden(JSON.stringify(data));
             state.fileName = payload.name || name;
@@ -224,9 +226,9 @@ function makePromptFileControls(node) {
         saveButton.disabled = true;
         try {
             syncPromptState(node);
-            const payload = await savePromptTemplateFile(state.fileName, promptPayloadFromState(state));
+            const payload = await savePromptTemplateLoraFile(state.fileName, promptPayloadFromState(state));
             const data = payload.data || {};
-            state.items = normalizePromptItems(JSON.stringify(data));
+            state.items = normalizePromptLoraItems(JSON.stringify(data));
             state.selectedId = promptSelectedId(JSON.stringify(data));
             state.listHidden = promptListHidden(JSON.stringify(data));
             state.fileName = payload.name || state.fileName;
@@ -275,6 +277,8 @@ function makePromptControls(node) {
             text_height: DEFAULT_TEXT_HEIGHT,
             collapsed: false,
             image_collapsed: true,
+            lora_collapsed: true,
+            lora: normalizeLora(),
             image: normalizeImage(),
         };
         node.__promptTemplateState.items.push(item);
@@ -498,6 +502,243 @@ function makePromptReferenceImage(node, item) {
     return section;
 }
 
+// ── LoRA block ────────────────────────────────────────────────────────────────
+
+function splitLoraPath(name) {
+    const parts = String(name || "").replaceAll("\\", "/").split("/").filter(Boolean);
+    if (parts.length <= 1) {
+        return { folder: "Root", file: parts[0] || "" };
+    }
+    return { folder: parts.slice(0, -1).join("/"), file: parts[parts.length - 1] };
+}
+
+function loraFileName(name) {
+    return splitLoraPath(name).file || "No LoRA";
+}
+
+function buildLoraTree(names) {
+    const root = { folders: new Map(), files: [] };
+    for (const name of names) {
+        const parts = String(name || "").replaceAll("\\", "/").split("/").filter(Boolean);
+        if (!parts.length) {
+            continue;
+        }
+        let current = root;
+        for (const part of parts.slice(0, -1)) {
+            if (!current.folders.has(part)) {
+                current.folders.set(part, { folders: new Map(), files: [] });
+            }
+            current = current.folders.get(part);
+        }
+        current.files.push({ name, label: parts[parts.length - 1] });
+    }
+    return root;
+}
+
+function loraNamesForNode(node, item) {
+    const names = new Set(node.__promptTemplateState.loras || []);
+    if (item.lora.name) {
+        names.add(item.lora.name);
+    }
+    return [...names].sort((a, b) => a.localeCompare(b));
+}
+
+function makeLoraMenuList(tree, onSelect) {
+    const list = document.createElement("ul");
+    list.className = "tr-lora-menu-list";
+
+    const folders = [...tree.folders.entries()].sort(([a], [b]) => a.localeCompare(b));
+    for (const [folder, childTree] of folders) {
+        const item = document.createElement("li");
+        item.className = "tr-lora-menu-folder";
+        const button = createButton(folder, "tr-lora-menu-item");
+        const submenu = makeLoraMenuList(childTree, onSelect);
+        submenu.classList.add("tr-lora-submenu");
+        item.addEventListener("mouseenter", () => {
+            item.classList.remove("tr-lora-open-left");
+            requestAnimationFrame(() => {
+                const rect = submenu.getBoundingClientRect();
+                if (rect.right > window.innerWidth - 8) {
+                    item.classList.add("tr-lora-open-left");
+                }
+            });
+        });
+        item.append(button, submenu);
+        list.appendChild(item);
+    }
+
+    const files = [...tree.files].sort((a, b) => a.label.localeCompare(b.label));
+    for (const file of files) {
+        const item = document.createElement("li");
+        item.className = "tr-lora-menu-file";
+        const button = createButton(file.label, "tr-lora-menu-item");
+        button.title = file.name;
+        button.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onSelect(file.name);
+        });
+        item.appendChild(button);
+        list.appendChild(item);
+    }
+
+    return list;
+}
+
+function makeLoraSearchResults(names, query, onSelect) {
+    const results = document.createElement("div");
+    results.className = "tr-lora-search-results";
+    const normalized = query.trim().toLowerCase();
+    if (!normalized) {
+        return results;
+    }
+
+    const matches = names.filter((name) => name.toLowerCase().includes(normalized)).slice(0, 60);
+    if (!matches.length) {
+        const empty = document.createElement("div");
+        empty.className = "tr-lora-empty";
+        empty.textContent = "No results";
+        results.appendChild(empty);
+        return results;
+    }
+
+    for (const name of matches) {
+        const button = createButton(name, "tr-lora-search-item");
+        button.title = name;
+        button.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onSelect(name);
+        });
+        results.appendChild(button);
+    }
+    return results;
+}
+
+function makeLoraPicker(node, item) {
+    item.lora = normalizeLora(item.lora);
+    const picker = document.createElement("div");
+    picker.className = "tr-lora-picker";
+
+    const button = createButton(item.lora.name ? loraFileName(item.lora.name) : "No LoRA", "tr-lora-select");
+    button.title = item.lora.name || "No LoRA";
+    const menu = document.createElement("div");
+    menu.className = "tr-lora-menu";
+
+    const names = loraNamesForNode(node, item);
+    const tree = buildLoraTree(names);
+
+    const closeMenu = () => {
+        picker.classList.remove("tr-lora-open");
+        menu.classList.remove("tr-lora-menu-open");
+        menu.remove();
+        document.removeEventListener("pointerdown", onDocumentPointerDown, true);
+        window.removeEventListener("resize", closeMenu, true);
+        window.removeEventListener("scroll", closeMenu, true);
+    };
+    const selectLora = (name) => {
+        item.lora = normalizeLora({ ...item.lora, name });
+        button.textContent = name ? loraFileName(name) : "No LoRA";
+        button.title = name || "No LoRA";
+        syncPromptState(node);
+        closeMenu();
+    };
+    const onDocumentPointerDown = (event) => {
+        if (!picker.contains(event.target) && !menu.contains(event.target)) {
+            closeMenu();
+        }
+    };
+
+    const positionMenu = () => {
+        const buttonRect = button.getBoundingClientRect();
+        const menuRect = menu.getBoundingClientRect();
+        const gap = 4;
+        let left = buttonRect.left;
+        let top = buttonRect.bottom + gap;
+
+        if (left + menuRect.width > window.innerWidth - gap) {
+            left = Math.max(gap, window.innerWidth - menuRect.width - gap);
+        }
+        if (top + menuRect.height > window.innerHeight - gap) {
+            top = Math.max(gap, buttonRect.top - menuRect.height - gap);
+        }
+
+        menu.style.left = `${Math.round(left)}px`;
+        menu.style.top = `${Math.round(top)}px`;
+    };
+
+    const rebuildMenu = (query = "") => {
+        menu.innerHTML = "";
+        const search = createInput(query, "Filter list");
+        search.className = "tr-lora-filter";
+        search.addEventListener("input", () => rebuildMenu(search.value));
+        search.addEventListener("keydown", (event) => event.stopPropagation());
+
+        const noneButton = createButton("None", "tr-lora-menu-item tr-lora-none");
+        noneButton.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            selectLora("");
+        });
+
+        menu.append(search, noneButton);
+        if (query.trim()) {
+            menu.appendChild(makeLoraSearchResults(names, query, selectLora));
+        } else {
+            menu.appendChild(makeLoraMenuList(tree, selectLora));
+        }
+        requestAnimationFrame(() => search.focus());
+    };
+
+    button.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (picker.classList.contains("tr-lora-open")) {
+            closeMenu();
+            return;
+        }
+        rebuildMenu();
+        picker.classList.add("tr-lora-open");
+        menu.classList.add("tr-lora-menu-open");
+        document.body.appendChild(menu);
+        positionMenu();
+        requestAnimationFrame(positionMenu);
+        document.addEventListener("pointerdown", onDocumentPointerDown, true);
+        window.addEventListener("resize", closeMenu, true);
+        window.addEventListener("scroll", closeMenu, true);
+    });
+
+    picker.append(button);
+    return picker;
+}
+
+function makePromptLoraPanel(node, item) {
+    item.lora = normalizeLora(item.lora);
+    const section = document.createElement("div");
+    section.className = "tr-lora-panel";
+
+    const select = makeLoraPicker(node, item);
+    const label = document.createElement("span");
+    label.className = "tr-lora-label";
+    label.textContent = "strength";
+
+    const strength = document.createElement("input");
+    strength.className = "tr-lora-strength";
+    strength.type = "number";
+    strength.step = "0.01";
+    strength.value = String(item.lora.strength);
+    strength.addEventListener("input", () => {
+        const value = Number(strength.value);
+        if (Number.isFinite(value)) {
+            item.lora = normalizeLora({ ...item.lora, strength: value });
+            syncPromptState(node);
+        }
+    });
+
+    section.append(select, label, strength);
+    return section;
+}
+
 // ── Prompt template block ──────────────────────────────────────────────────────
 
 function makePromptTemplateBlock(node, item, index) {
@@ -514,6 +755,7 @@ function makePromptTemplateBlock(node, item, index) {
 
     const toggleButton = createButton(item.collapsed ? "Show" : "Hide", "tr-toggle");
     const imageToggleButton = createButton("Image", "tr-toggle tr-image-toggle");
+    const loraToggleButton = createButton("LoRA", "tr-toggle tr-lora-toggle");
     const copyButton = createButton("Copy", "tr-copy");
     const fitButton = createButton("Fit", "tr-fit-text");
     const deleteButton = createButton("Delete", "tr-delete");
@@ -531,6 +773,13 @@ function makePromptTemplateBlock(node, item, index) {
         event.preventDefault();
         event.stopPropagation();
         item.image_collapsed = !item.image_collapsed;
+        refreshPromptNode(node);
+    });
+
+    loraToggleButton.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        item.lora_collapsed = !item.lora_collapsed;
         refreshPromptNode(node);
     });
 
@@ -563,7 +812,7 @@ function makePromptTemplateBlock(node, item, index) {
         }
     });
 
-    headerActions.append(toggleButton, imageToggleButton, copyButton, fitButton, deleteButton);
+    headerActions.append(toggleButton, imageToggleButton, loraToggleButton, copyButton, fitButton, deleteButton);
     header.append(label, headerActions);
 
     const title = makeEditableTitle(item.title, (value) => {
@@ -618,6 +867,9 @@ function makePromptTemplateBlock(node, item, index) {
         if (!item.image_collapsed) {
             block.append(makePromptReferenceImage(node, item));
         }
+        if (!item.lora_collapsed) {
+            block.append(makePromptLoraPanel(node, item));
+        }
     }
     return block;
 }
@@ -649,6 +901,24 @@ function renderPromptNode(node) {
     state.root.appendChild(list);
 }
 
+async function loadLoraList(node) {
+    const state = node.__promptTemplateState;
+    if (!state || state.loraLoadQueued) {
+        return;
+    }
+    state.loraLoadQueued = true;
+    try {
+        state.loras = await fetchLoraList();
+        renderPromptNode(node);
+        updatePromptNodeSize(node);
+    } catch (error) {
+        console.error(error);
+        state.loras = [];
+    } finally {
+        state.loraLoadQueued = false;
+    }
+}
+
 // ── Editor creation ────────────────────────────────────────────────────────────
 
 function createPromptEditor(node) {
@@ -665,13 +935,15 @@ function createPromptEditor(node) {
 
     node.__promptTemplateState = {
         root,
-        items: normalizePromptItems(findWidget(node, PROMPT_STORAGE_WIDGET)?.value),
+        items: normalizePromptLoraItems(findWidget(node, PROMPT_STORAGE_WIDGET)?.value),
         listHidden: promptListHidden(findWidget(node, PROMPT_STORAGE_WIDGET)?.value),
         selectedId: promptSelectedId(findWidget(node, PROMPT_STORAGE_WIDGET)?.value),
         selector: null,
         fileName: promptFileName(findWidget(node, PROMPT_STORAGE_WIDGET)?.value),
         files: [],
         fileSelector: null,
+        loras: [],
+        loraLoadQueued: false,
         draggingId: "",
     };
 
@@ -680,7 +952,7 @@ function createPromptEditor(node) {
 
 // ── Node setup (exported for use by template_reference.js registration) ────────
 
-export function setupPromptNode(node) {
+export function setupPromptLoraNode(node) {
     node.serialize_widgets = true;
 
     const storageWidget = findWidget(node, PROMPT_STORAGE_WIDGET);
@@ -698,15 +970,16 @@ export function setupPromptNode(node) {
             },
         });
     } else {
-        node.__promptTemplateState.items = normalizePromptItems(storageWidget?.value);
+        node.__promptTemplateState.items = normalizePromptLoraItems(storageWidget?.value);
         node.__promptTemplateState.listHidden = promptListHidden(storageWidget?.value);
         node.__promptTemplateState.selectedId = promptSelectedId(storageWidget?.value);
         node.__promptTemplateState.fileName = promptFileName(storageWidget?.value) || node.__promptTemplateState.fileName || "";
     }
 
-    node.syncPromptTemplate = () => syncPromptState(node);
+    node.syncPromptTemplateLoRA = () => syncPromptState(node);
     renderPromptNode(node);
     syncPromptState(node);
     updatePromptNodeSize(node);
     loadPromptTemplateFiles(node, node.__promptTemplateState.fileName);
+    loadLoraList(node);
 }

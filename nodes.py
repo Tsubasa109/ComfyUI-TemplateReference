@@ -7,6 +7,8 @@ import shutil
 from pathlib import Path
 
 import folder_paths
+import comfy.sd
+import comfy.utils
 import node_helpers
 import numpy as np
 import torch
@@ -21,17 +23,26 @@ LEGACY_PROMPT_TEMPLATES_DIR = EXTENSION_DIR / "prompt_templates"
 LEGACY_REFERENCE_TEMPLATES_DIR = EXTENSION_DIR / "Template Reference"
 PROMPT_TEMPLATES_DIR = STORAGE_ROOT / "prompt_templates"
 PROMPT_TEMPLATE_IMAGES_DIR = PROMPT_TEMPLATES_DIR / "images"
+PROMPT_TEMPLATES_LORA_DIR = STORAGE_ROOT / "prompt_templates_lora"
+PROMPT_TEMPLATE_LORA_IMAGES_DIR = PROMPT_TEMPLATES_LORA_DIR / "images"
 REFERENCE_TEMPLATES_DIR = STORAGE_ROOT / "reference_templates"
 REFERENCE_TEMPLATE_IMAGES_DIR = REFERENCE_TEMPLATES_DIR / "image"
 LEGACY_PROMPT_TEMPLATE_IMAGES_DIR = LEGACY_PROMPT_TEMPLATES_DIR / "images"
 LEGACY_REFERENCE_TEMPLATE_IMAGES_DIR = LEGACY_REFERENCE_TEMPLATES_DIR / "image"
 LOGGER = logging.getLogger(__name__)
+_LOADED_LORA_CACHE = None
 
 
 def _ensure_prompt_templates_dir():
     PROMPT_TEMPLATES_DIR.mkdir(parents=True, exist_ok=True)
     PROMPT_TEMPLATE_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
     return PROMPT_TEMPLATES_DIR
+
+
+def _ensure_prompt_templates_lora_dir():
+    PROMPT_TEMPLATES_LORA_DIR.mkdir(parents=True, exist_ok=True)
+    PROMPT_TEMPLATE_LORA_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+    return PROMPT_TEMPLATES_LORA_DIR
 
 
 def _ensure_reference_templates_dir():
@@ -70,6 +81,17 @@ def _prompt_template_path(name):
     return safe, path
 
 
+def _prompt_template_lora_path(name):
+    safe = _safe_prompt_template_name(name)
+    if not safe.lower().endswith("lora"):
+        safe = f"{safe}_lora"
+    base = _ensure_prompt_templates_lora_dir().resolve()
+    path = (base / f"{safe}.json").resolve()
+    if base != path.parent:
+        raise ValueError("Prompt Template LoRA path escapes storage directory.")
+    return safe, path
+
+
 def _existing_prompt_template_path(name):
     safe = _safe_prompt_template_name(name)
     for base in _existing_template_dirs(_ensure_prompt_templates_dir(), LEGACY_PROMPT_TEMPLATES_DIR):
@@ -77,6 +99,15 @@ def _existing_prompt_template_path(name):
         if base.resolve() == path.parent and path.is_file():
             return safe, path
     return safe, (_ensure_prompt_templates_dir().resolve() / f"{safe}.json").resolve()
+
+
+def _existing_prompt_template_lora_path(name):
+    safe = _safe_prompt_template_name(name)
+    base = _ensure_prompt_templates_lora_dir().resolve()
+    path = (base / f"{safe}.json").resolve()
+    if base == path.parent and path.is_file():
+        return safe, path
+    return safe, path
 
 
 def _reference_template_path(name):
@@ -148,7 +179,10 @@ def _source_image_path(image):
     """
     if not isinstance(image, dict):
         return None
-    if image.get("storage") == "prompt_template" or image.get("type") == "prompt_template":
+    local_path = _local_saved_image_path(image.get("path"))
+    if local_path is not None:
+        return local_path
+    if image.get("storage") in ("prompt_template", "prompt_template_lora") or image.get("type") in ("prompt_template", "prompt_template_lora"):
         template_name = image.get("template") or image.get("template_name") or ""
         name = image.get("name") or ""
         if not template_name and image.get("path"):
@@ -158,7 +192,10 @@ def _source_image_path(image):
                 if len(parts) > index + 1:
                     template_name = parts[index + 1]
         if template_name and name:
-            for base in (PROMPT_TEMPLATE_IMAGES_DIR, LEGACY_PROMPT_TEMPLATE_IMAGES_DIR):
+            bases = [PROMPT_TEMPLATE_IMAGES_DIR, LEGACY_PROMPT_TEMPLATE_IMAGES_DIR]
+            if image.get("storage") == "prompt_template_lora" or image.get("type") == "prompt_template_lora":
+                bases = [PROMPT_TEMPLATE_LORA_IMAGES_DIR, PROMPT_TEMPLATE_IMAGES_DIR, LEGACY_PROMPT_TEMPLATE_IMAGES_DIR]
+            for base in bases:
                 _, _, path = _stored_image_path(template_name, name, base)
                 if path.is_file():
                     return path
@@ -192,6 +229,14 @@ def _local_saved_image_path(image_path):
         return None
 
     parts = normalized.split("/")
+    if len(parts) >= 4 and parts[0] == "prompt_templates_lora" and parts[1] == "images":
+        try:
+            _, _, path = _stored_image_path(parts[2], parts[-1], PROMPT_TEMPLATE_LORA_IMAGES_DIR)
+            if path.is_file():
+                return path
+        except ValueError:
+            pass
+
     if len(parts) >= 4 and parts[0] == "prompt_templates" and parts[1] == "images":
         for base in (PROMPT_TEMPLATE_IMAGES_DIR, LEGACY_PROMPT_TEMPLATE_IMAGES_DIR):
             try:
@@ -235,6 +280,34 @@ def _copy_prompt_template_images(template_name, data):
         image["type"] = "prompt_template"
         image["path"] = f"prompt_templates/images/{safe_template}/{safe_image}"
         image["storage"] = "prompt_template"
+        image["template"] = safe_template
+        image["template_name"] = safe_template
+        item["image"] = image
+    return data
+
+
+def _copy_prompt_template_lora_images(template_name, data):
+    used_names = set()
+    for item in data.get("items", []):
+        image = item.get("image") if isinstance(item.get("image"), dict) else {}
+        source = _source_image_path(image)
+        if source is None:
+            continue
+
+        preferred = image.get("name") or source.name
+        safe_template, safe_image, destination = _stored_image_path(template_name, preferred, PROMPT_TEMPLATE_LORA_IMAGES_DIR)
+        if safe_image in used_names and source.resolve() != destination.resolve():
+            safe_template, safe_image, destination = _unique_image_path(template_name, preferred, PROMPT_TEMPLATE_LORA_IMAGES_DIR)
+        used_names.add(safe_image)
+
+        if source.resolve() != destination.resolve():
+            shutil.copy2(source, destination)
+
+        image["name"] = safe_image
+        image["subfolder"] = ""
+        image["type"] = "prompt_template_lora"
+        image["path"] = f"prompt_templates_lora/images/{safe_template}/{safe_image}"
+        image["storage"] = "prompt_template_lora"
         image["template"] = safe_template
         image["template_name"] = safe_template
         item["image"] = image
@@ -288,6 +361,33 @@ def _normalize_prompt_template_payload(data):
         "list_hidden": bool(payload.get("list_hidden")),
         "items": items,
     }
+
+
+def _normalize_prompt_template_lora_payload(data):
+    if isinstance(data, str):
+        payload = json.loads(data or "{}")
+    elif isinstance(data, dict):
+        payload = data
+    else:
+        raise ValueError("Prompt Template LoRA data must be a JSON object.")
+    if not isinstance(payload, dict):
+        raise ValueError("Prompt Template LoRA data must be a JSON object.")
+    items = PromptTemplateLoRA._parse_items(json.dumps(payload, ensure_ascii=False))
+    selected_id = PromptTemplateLoRA._selected_id(json.dumps(payload, ensure_ascii=False))
+    return {
+        "version": 1,
+        "selected_id": selected_id,
+        "list_hidden": bool(payload.get("list_hidden")),
+        "items": items,
+    }
+
+
+@PromptServer.instance.routes.get("/template_reference/loras")
+async def list_loras(request):
+    try:
+        return web.json_response({"success": True, "loras": folder_paths.get_filename_list("loras")})
+    except Exception as exc:
+        return web.json_response({"success": False, "error": str(exc)}, status=500)
 
 
 def _normalize_reference_template_payload(data):
@@ -372,6 +472,84 @@ async def save_prompt_template(request):
         return web.json_response({"success": False, "error": str(exc)}, status=400)
     except json.JSONDecodeError:
         return web.json_response({"success": False, "error": "Template JSON is invalid."}, status=400)
+    except Exception as exc:
+        return web.json_response({"success": False, "error": str(exc)}, status=500)
+
+
+@PromptServer.instance.routes.get("/template_reference/prompt_templates_lora")
+async def list_prompt_templates_lora(request):
+    try:
+        folder = _ensure_prompt_templates_lora_dir()
+        files = {
+            path.stem
+            for path in folder.glob("*.json")
+            if path.is_file()
+        }
+        files.update(
+            path.stem
+            for base in _existing_template_dirs(_ensure_prompt_templates_dir(), LEGACY_PROMPT_TEMPLATES_DIR)
+            for path in base.glob("*.json")
+            if path.is_file()
+        )
+        files = sorted(files)
+        return web.json_response({"success": True, "templates": files})
+    except Exception as exc:
+        return web.json_response({"success": False, "error": str(exc)}, status=500)
+
+
+@PromptServer.instance.routes.get("/template_reference/prompt_templates_lora/{name}")
+async def open_prompt_template_lora(request):
+    try:
+        safe, path = _existing_prompt_template_lora_path(request.match_info.get("name", ""))
+        if not path.is_file():
+            safe, path = _existing_prompt_template_path(request.match_info.get("name", ""))
+        if not path.is_file():
+            return web.json_response({"success": False, "error": "Prompt Template file not found."}, status=404)
+        with path.open("r", encoding="utf-8") as file:
+            payload = json.load(file)
+        data = _normalize_prompt_template_lora_payload(payload)
+        return web.json_response({"success": True, "name": safe, "data": data})
+    except ValueError as exc:
+        return web.json_response({"success": False, "error": str(exc)}, status=400)
+    except json.JSONDecodeError:
+        return web.json_response({"success": False, "error": "Prompt Template LoRA JSON is invalid."}, status=400)
+    except Exception as exc:
+        return web.json_response({"success": False, "error": str(exc)}, status=500)
+
+
+@PromptServer.instance.routes.get("/template_reference/prompt_templates_lora/image/{template}/{image}")
+async def view_prompt_template_lora_image(request):
+    try:
+        _, _, path = _stored_image_path(
+            request.match_info.get("template", ""),
+            request.match_info.get("image", ""),
+            PROMPT_TEMPLATE_LORA_IMAGES_DIR,
+        )
+        if not path.is_file():
+            return web.json_response({"success": False, "error": "Image file not found."}, status=404)
+        return web.FileResponse(path)
+    except ValueError as exc:
+        return web.json_response({"success": False, "error": str(exc)}, status=400)
+    except Exception as exc:
+        return web.json_response({"success": False, "error": str(exc)}, status=500)
+
+
+@PromptServer.instance.routes.post("/template_reference/prompt_templates_lora/save")
+async def save_prompt_template_lora(request):
+    try:
+        body = await request.json()
+        safe, path = _prompt_template_lora_path(body.get("name", ""))
+        data = _normalize_prompt_template_lora_payload(body.get("data"))
+        data = _copy_prompt_template_lora_images(safe, data)
+        with path.open("w", encoding="utf-8") as file:
+            json.dump(data, file, ensure_ascii=False, indent=2)
+            file.write("\n")
+        files = sorted(item.stem for item in _ensure_prompt_templates_lora_dir().glob("*.json") if item.is_file())
+        return web.json_response({"success": True, "name": safe, "templates": files, "data": data})
+    except ValueError as exc:
+        return web.json_response({"success": False, "error": str(exc)}, status=400)
+    except json.JSONDecodeError:
+        return web.json_response({"success": False, "error": "Prompt Template LoRA JSON is invalid."}, status=400)
     except Exception as exc:
         return web.json_response({"success": False, "error": str(exc)}, status=500)
 
@@ -705,6 +883,10 @@ class PromptTemplate:
 
     @staticmethod
     def _parse_items(prompt_template_json):
+        return PromptTemplate._parse_prompt_items(prompt_template_json, include_lora=False)
+
+    @staticmethod
+    def _parse_prompt_items(prompt_template_json, include_lora=False):
         try:
             payload = json.loads(prompt_template_json or "{}")
         except Exception:
@@ -729,37 +911,141 @@ class PromptTemplate:
                 preview_height = int(image.get("preview_height") or 138)
             except (TypeError, ValueError):
                 preview_height = 138
-            items.append(
-                {
-                    "id": str(raw.get("id") or ""),
-                    "type": "text",
-                    "title": str(raw.get("title") or ""),
-                    "text": str(raw.get("text") or ""),
-                    "text_height": text_height,
-                    "collapsed": bool(raw.get("collapsed")),
-                    "image_collapsed": bool(raw.get("image_collapsed", True)),
-                    "image": {
-                        "name": str(image.get("name") or ""),
-                        "subfolder": str(image.get("subfolder") or ""),
-                        "type": str(image.get("type") or "input"),
-                        "path": str(image.get("path") or ""),
-                        "preview_height": preview_height,
-                        "storage": str(image.get("storage") or ""),
-                        "template": str(image.get("template") or image.get("template_name") or ""),
-                        "template_name": str(image.get("template_name") or image.get("template") or ""),
-                    },
+            item = {
+                "id": str(raw.get("id") or ""),
+                "type": "text",
+                "title": str(raw.get("title") or ""),
+                "text": str(raw.get("text") or ""),
+                "text_height": text_height,
+                "collapsed": bool(raw.get("collapsed")),
+                "image_collapsed": bool(raw.get("image_collapsed", True)),
+                "image": {
+                    "name": str(image.get("name") or ""),
+                    "subfolder": str(image.get("subfolder") or ""),
+                    "type": str(image.get("type") or "input"),
+                    "path": str(image.get("path") or ""),
+                    "preview_height": preview_height,
+                    "storage": str(image.get("storage") or ""),
+                    "template": str(image.get("template") or image.get("template_name") or ""),
+                    "template_name": str(image.get("template_name") or image.get("template") or ""),
+                },
+            }
+            if include_lora:
+                lora = raw.get("lora") if isinstance(raw.get("lora"), dict) else {}
+                try:
+                    lora_strength = float(lora.get("strength", 1.0))
+                except (TypeError, ValueError):
+                    lora_strength = 1.0
+                item["lora_collapsed"] = bool(raw.get("lora_collapsed", True))
+                item["lora"] = {
+                    "name": str(lora.get("name") or ""),
+                    "strength": lora_strength,
                 }
-            )
+            items.append(item)
 
         return items
+
+
+class PromptTemplateLoRA(PromptTemplate):
+    @staticmethod
+    def _parse_items(prompt_template_json):
+        return PromptTemplate._parse_prompt_items(prompt_template_json, include_lora=True)
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "model": ("MODEL", {"tooltip": "Model to apply the selected prompt block LoRA to."}),
+                "clip": ("CLIP", {"tooltip": "CLIP to apply the selected prompt block LoRA to."}),
+                "prompt_template_json": (
+                    "STRING",
+                    {
+                        "default": '{"version":1,"items":[]}',
+                        "multiline": True,
+                        "tooltip": "Serialized prompt template blocks edited by the custom UI.",
+                    },
+                ),
+            },
+        }
+
+    RETURN_TYPES = ("STRING", "STRING", "MODEL", "CLIP", "STRING")
+    RETURN_NAMES = ("selected_prompt", "prompt", "lora_model", "lora_clip", "template_json")
+    FUNCTION = "build_prompt_lora"
+    CATEGORY = "template_reference"
+    DESCRIPTION = "Outputs selected prompt text and applies that block's LoRA to model/clip."
+
+    def build_prompt_lora(self, model, clip, prompt_template_json):
+        items = self._parse_items(prompt_template_json)
+        selected_template_id = self._selected_id(prompt_template_json)
+        list_hidden = self._list_hidden(prompt_template_json)
+        selected_prompt = ""
+        lora_model = model
+        lora_clip = clip
+
+        if items and selected_template_id:
+            selected = next((item for item in items if str(item.get("id") or "") == str(selected_template_id or "")), None)
+            if selected is not None:
+                selected_prompt = str(selected.get("text") or "")
+                lora_model, lora_clip = self._apply_lora(model, clip, selected)
+
+        normalized_json = json.dumps(
+            {"version": 1, "selected_id": selected_template_id, "list_hidden": list_hidden, "items": items},
+            ensure_ascii=False,
+        )
+        return (selected_prompt, selected_prompt, lora_model, lora_clip, normalized_json)
+
+    @classmethod
+    def IS_CHANGED(cls, model, clip, prompt_template_json):
+        hasher = hashlib.sha256()
+        hasher.update(str(prompt_template_json).encode("utf-8", errors="replace"))
+        return hasher.hexdigest()
+
+    @classmethod
+    def VALIDATE_INPUTS(cls, model, clip, prompt_template_json):
+        return PromptTemplate.VALIDATE_INPUTS(prompt_template_json)
+
+    @staticmethod
+    def _apply_lora(model, clip, item):
+        global _LOADED_LORA_CACHE
+        lora = item.get("lora") if isinstance(item.get("lora"), dict) else {}
+        lora_name = str(lora.get("name") or "")
+        try:
+            strength = float(lora.get("strength", 1.0))
+        except (TypeError, ValueError):
+            strength = 1.0
+
+        if not lora_name or strength == 0:
+            return model, clip
+
+        try:
+            lora_path = folder_paths.get_full_path_or_raise("loras", lora_name)
+        except Exception as exc:
+            LOGGER.warning("Prompt Template LoRA not found %r: %s", lora_name, exc)
+            return model, clip
+        loaded_lora = None
+        lora_metadata = None
+        if _LOADED_LORA_CACHE is not None:
+            if _LOADED_LORA_CACHE[0] == lora_path:
+                loaded_lora = _LOADED_LORA_CACHE[1]
+                lora_metadata = _LOADED_LORA_CACHE[2] if len(_LOADED_LORA_CACHE) > 2 else None
+            else:
+                _LOADED_LORA_CACHE = None
+
+        if loaded_lora is None:
+            loaded_lora, lora_metadata = comfy.utils.load_torch_file(lora_path, safe_load=True, return_metadata=True)
+            _LOADED_LORA_CACHE = (lora_path, loaded_lora, lora_metadata)
+
+        return comfy.sd.load_lora_for_models(model, clip, loaded_lora, strength, strength, lora_metadata=lora_metadata)
 
 
 NODE_CLASS_MAPPINGS = {
     "TemplateReference": TemplateReference,
     "PromptTemplate": PromptTemplate,
+    "PromptTemplateLoRA": PromptTemplateLoRA,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "TemplateReference": "Template Reference",
     "PromptTemplate": "Prompt Template",
+    "PromptTemplateLoRA": "Prompt Template LoRA",
 }

@@ -125,4 +125,3 @@ These folders contain user-created JSON libraries and copied reference images.
 ## License
 
 Apache License 2.0 (see LICENSE)
-

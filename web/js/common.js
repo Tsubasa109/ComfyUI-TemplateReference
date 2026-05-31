@@ -4,9 +4,12 @@ import { api } from "../../../scripts/api.js";
 export const NODE_NAME = "TemplateReference";
 export const STORAGE_WIDGET = "template_json";
 export const PROMPT_NODE_NAME = "PromptTemplate";
+export const PROMPT_LORA_NODE_NAME = "PromptTemplateLoRA";
 export const PROMPT_STORAGE_WIDGET = "prompt_template_json";
 export const PROMPT_TEMPLATE_API = "/template_reference/prompt_templates";
+export const PROMPT_TEMPLATE_LORA_API = "/template_reference/prompt_templates_lora";
 export const REFERENCE_TEMPLATE_API = "/template_reference/reference_templates";
+export const LORA_API = "/template_reference/loras";
 export const NODE_MIN_WIDTH = 460;
 export const NODE_MIN_HEIGHT = 150;
 export const NODE_CHROME_HEIGHT = 92;
@@ -125,6 +128,35 @@ export function normalizePromptItems(value) {
         }));
 }
 
+export function normalizeLora(lora = {}) {
+    const source = lora && typeof lora === "object" ? lora : {};
+    const strength = Number(source.strength);
+    return {
+        name: source.name || "",
+        strength: Number.isFinite(strength) ? strength : 1.0,
+    };
+}
+
+export function normalizePromptLoraItems(value) {
+    let rawItems = [];
+    try {
+        const payload = JSON.parse(value || "{}");
+        rawItems = Array.isArray(payload) ? payload : Array.isArray(payload.items) ? payload.items : [];
+    } catch {
+        rawItems = [];
+    }
+
+    return normalizePromptItems(value).map((item, index) => {
+        const rawById = rawItems.find((entry) => entry && entry.id && entry.id === item.id);
+        const raw = rawById || rawItems[index] || {};
+        return {
+            ...item,
+            lora_collapsed: raw.lora_collapsed !== false,
+            lora: normalizeLora(raw.lora),
+        };
+    });
+}
+
 export function normalizeTemplateList(payload) {
     return Array.isArray(payload?.templates) ? payload.templates.filter((name) => typeof name === "string") : [];
 }
@@ -228,6 +260,23 @@ export function imagePath(image) {
 export function imageViewUrl(image) {
     if (!image?.name) {
         return "";
+    }
+
+    const normalizedPath = image.path ? image.path.replaceAll("\\", "/") : "";
+
+    if (image.storage === "prompt_template_lora" || image.type === "prompt_template_lora" || normalizedPath.startsWith("prompt_templates_lora/images/")) {
+        let templateName = image.template || image.template_name || "";
+        if (!templateName && image.path) {
+            const parts = normalizedPath.split("/");
+            const imagesIndex = parts.findIndex((part) => part === "images");
+            if (imagesIndex >= 0 && parts[imagesIndex + 1]) {
+                templateName = parts[imagesIndex + 1];
+            }
+        }
+        if (!templateName) {
+            return "";
+        }
+        return api.apiURL(`${PROMPT_TEMPLATE_LORA_API}/image/${encodeURIComponent(templateName)}/${encodeURIComponent(image.name)}?t=${Date.now()}`);
     }
 
     if (image.storage === "prompt_template" || image.type === "prompt_template") {
