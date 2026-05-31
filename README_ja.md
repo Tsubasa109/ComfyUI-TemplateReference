@@ -145,6 +145,8 @@ ComfyUI/user/template_reference/prompt_templates/
 ComfyUI/user/template_reference/prompt_templates/images/
 ComfyUI/user/template_reference/reference_templates/
 ComfyUI/user/template_reference/reference_templates/image/
+ComfyUI/user/template_reference/prompt_templates_lora/
+ComfyUI/user/template_reference/prompt_templates_lora/image/
 ```
 
 これらのフォルダには、ユーザーが作成した JSON ライブラリと、コピーされた参照画像が保存されます。
