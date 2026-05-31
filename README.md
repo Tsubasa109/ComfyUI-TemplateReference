@@ -148,6 +148,8 @@ ComfyUI/user/template_reference/prompt_templates/
 ComfyUI/user/template_reference/prompt_templates/images/
 ComfyUI/user/template_reference/reference_templates/
 ComfyUI/user/template_reference/reference_templates/image/
+ComfyUI/user/template_reference/prompt_templates_lora/
+ComfyUI/user/template_reference/prompt_templates_lora/image/
 ```
 
 These folders contain user-created JSON libraries and copied reference images.
