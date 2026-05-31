@@ -4,6 +4,10 @@
 
 ComfyUI Template Reference adds two custom nodes for building reusable text, image, and prompt-template libraries directly inside ComfyUI.
 
+## Notice
+* May 31, 2026 - Update: Added the “Prompt Template LoRA” node, which adds LoRA application functionality to prompt templates.
+
+
 ## Features
 
 ### Template Reference Feature
@@ -25,6 +29,12 @@ ComfyUI Template Reference adds two custom nodes for building reusable text, ima
 * Drag and reorder blocks.
 * Collapse, expand, resize, copy, and delete blocks directly in the node UI.
 * JSON data created by the user is saved in ComfyUI’s user directory.
+
+### Prompt Template LoRA Application Feature
+
+* In addition to the prompt template feature, LoRA application can be added to LoRA templates.
+* JSON data created by the user is saved in ComfyUI’s user directory.
+* JSON data saved using the prompt template feature is also loaded and applied.
 
 ## Nodes
 
@@ -80,6 +90,43 @@ Main controls:
 - `Fit`: Adjust the block to fit the size of its text or reference image.
 - `Delete`: Delete the block.
 - `Upload`: Upload a reference image.
+
+### Prompt Template LoRA
+
+![Prompt Template Node](./image/image3.png)
+
+This node applies LoRA in addition to the “Prompt Template” functionality described above.
+
+Inputs:
+
+* `model`: Model input
+* `clip`: CLIP input
+
+Outputs:
+
+* `selected_prompt`: The text of the selected prompt block.
+* `prompt`: The same selected prompt text. This output is provided for convenience.
+* `lora_model`: Model output with LoRA applied
+* `loraclip`: CLIP output with LoRA applied
+* `template_json`: The serialized state of the entire node.
+
+Main operations:
+
+* `Open` / `Save`: Loads or saves the JSON library for Prompt Template LoRA or Prompt Template. The filename will have “lora” appended to the end.
+* `none`: Outputs an empty prompt.
+* `Output`: Selects the template to send to the text output.
+* `List Off` / `List On`: Turns each block off/on.
+* `Hide All` / `Show all`: Hides/shows each block.
+* `Add Template`: Adds a prompt template block.
+* `Hide` / `Show`: Hides/shows the target block.
+* `LoRA`: Opens the LoRA screen.
+* `Image`: Shows or hides the optional reference image area for each prompt block.
+* `Copy`: Copies the contents of the prompt text box to the clipboard.
+* `Fit`: Optimizes the block size to fit the text/reference image.
+* `Delete`: Deletes the block.
+* `Upload`: Uploads a reference image.
+* `LoRA screen`: Selects the LoRA model to apply from ComfyUI’s `lora` folder.
+* `STRENGTH`: Adjusts the strength value of the LoRA influence.
 
 ## Installation
 
