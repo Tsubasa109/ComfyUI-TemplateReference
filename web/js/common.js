@@ -69,6 +69,7 @@ export function normalizeImage(image = {}) {
         storage: image.storage || "",
         template: image.template || image.template_name || "",
         template_name: image.template_name || image.template || "",
+        cache_key: image.cache_key || "",
     };
 }
 
@@ -263,6 +264,7 @@ export function imageViewUrl(image) {
     }
 
     const normalizedPath = image.path ? image.path.replaceAll("\\", "/") : "";
+    const cacheKey = image.cache_key ? `?t=${encodeURIComponent(image.cache_key)}` : "";
 
     if (image.storage === "prompt_template_lora" || image.type === "prompt_template_lora" || normalizedPath.startsWith("prompt_templates_lora/images/")) {
         let templateName = image.template || image.template_name || "";
@@ -276,7 +278,7 @@ export function imageViewUrl(image) {
         if (!templateName) {
             return "";
         }
-        return api.apiURL(`${PROMPT_TEMPLATE_LORA_API}/image/${encodeURIComponent(templateName)}/${encodeURIComponent(image.name)}?t=${Date.now()}`);
+        return api.apiURL(`${PROMPT_TEMPLATE_LORA_API}/image/${encodeURIComponent(templateName)}/${encodeURIComponent(image.name)}${cacheKey}`);
     }
 
     if (image.storage === "prompt_template" || image.type === "prompt_template") {
@@ -291,7 +293,7 @@ export function imageViewUrl(image) {
         if (!templateName) {
             return "";
         }
-        return api.apiURL(`${PROMPT_TEMPLATE_API}/image/${encodeURIComponent(templateName)}/${encodeURIComponent(image.name)}?t=${Date.now()}`);
+        return api.apiURL(`${PROMPT_TEMPLATE_API}/image/${encodeURIComponent(templateName)}/${encodeURIComponent(image.name)}${cacheKey}`);
     }
 
     if (image.storage === "template_reference_file" || image.type === "template_reference_file") {
@@ -306,15 +308,17 @@ export function imageViewUrl(image) {
         if (!templateName) {
             return "";
         }
-        return api.apiURL(`${REFERENCE_TEMPLATE_API}/image/${encodeURIComponent(templateName)}/${encodeURIComponent(image.name)}?t=${Date.now()}`);
+        return api.apiURL(`${REFERENCE_TEMPLATE_API}/image/${encodeURIComponent(templateName)}/${encodeURIComponent(image.name)}${cacheKey}`);
     }
 
     const params = new URLSearchParams({
         filename: image.name,
         type: image.type || "input",
         subfolder: image.subfolder || "",
-        t: Date.now().toString(),
     });
+    if (image.cache_key) {
+        params.set("t", image.cache_key);
+    }
     return api.apiURL(`/view?${params.toString()}`);
 }
 
@@ -570,6 +574,7 @@ export async function uploadImage(file) {
         name: payload.name || file.name,
         subfolder: payload.subfolder || IMAGE_SUBFOLDER,
         type: payload.type || "input",
+        cache_key: `${Date.now()}`,
     };
     image.path = imagePath(image);
     return image;

@@ -87,12 +87,15 @@ function updateNodeSize(node, options = {}) {
     const currentHeight = node.size?.[1] || 0;
     const currentWidth = node.size?.[0] || 0;
 
-    if (Math.abs(currentHeight - targetHeight) > 1 || currentWidth < targetWidth) {
+    const sizeChanged = Math.abs(currentHeight - targetHeight) > 1 || currentWidth < targetWidth;
+    if (sizeChanged) {
         node.setSize?.([targetWidth, targetHeight]);
     }
 
-    node.onResize?.(node.size);
-    app.graph?.setDirtyCanvas?.(true, true);
+    if (sizeChanged) {
+        node.onResize?.(node.size);
+        app.graph?.setDirtyCanvas?.(true, true);
+    }
 }
 
 // ── State sync ─────────────────────────────────────────────────────────────────
@@ -105,7 +108,12 @@ function syncState(node) {
     }
 
     ensureReferenceSelection(node);
-    widget.value = JSON.stringify({ version: 1, selected_id: state.selectedId || "", list_hidden: Boolean(state.listHidden), file_name: state.fileName || "", items: state.items });
+    const nextValue = JSON.stringify({ version: 1, selected_id: state.selectedId || "", list_hidden: Boolean(state.listHidden), file_name: state.fileName || "", items: state.items });
+    if (widget.value === nextValue) {
+        return;
+    }
+
+    widget.value = nextValue;
     if (widget.inputEl) {
         widget.inputEl.value = widget.value;
     }

@@ -86,12 +86,15 @@ function updatePromptNodeSize(node, options = {}) {
     const currentHeight = node.size?.[1] || 0;
     const currentWidth = node.size?.[0] || 0;
 
-    if (Math.abs(currentHeight - targetHeight) > 1 || currentWidth < targetWidth) {
+    const sizeChanged = Math.abs(currentHeight - targetHeight) > 1 || currentWidth < targetWidth;
+    if (sizeChanged) {
         node.setSize?.([targetWidth, targetHeight]);
     }
 
-    node.onResize?.(node.size);
-    app.graph?.setDirtyCanvas?.(true, true);
+    if (sizeChanged) {
+        node.onResize?.(node.size);
+        app.graph?.setDirtyCanvas?.(true, true);
+    }
 }
 
 // ── State sync ─────────────────────────────────────────────────────────────────
@@ -104,7 +107,12 @@ export function syncPromptState(node) {
     }
 
     ensurePromptSelection(node);
-    widget.value = JSON.stringify({ ...promptPayloadFromState(state), file_name: state.fileName || "" });
+    const nextValue = JSON.stringify({ ...promptPayloadFromState(state), file_name: state.fileName || "" });
+    if (widget.value === nextValue) {
+        return;
+    }
+
+    widget.value = nextValue;
     if (widget.inputEl) {
         widget.inputEl.value = widget.value;
     }
